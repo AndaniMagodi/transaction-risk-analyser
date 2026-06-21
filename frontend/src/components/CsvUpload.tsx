@@ -1,5 +1,7 @@
 import { useRef, useState } from "react"
 import Papa from "papaparse"
+import { Box, Typography } from "@mui/material"
+import UploadFileIcon from "@mui/icons-material/UploadFile"
 import type { Transaction } from "../api/analysis"
 
 interface Props {
@@ -48,27 +50,43 @@ export default function CsvUpload({ onParsed }: Props) {
   }
 
   return (
-    <div
+    <Box
       onDrop={handleDrop}
       onDragOver={(e) => e.preventDefault()}
       onClick={() => fileInputRef.current?.click()}
-      className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-colors"
+      sx={{
+        border: "2px dashed",
+        borderColor: "divider",
+        borderRadius: 2,
+        p: 4,
+        textAlign: "center",
+        cursor: "pointer",
+        transition: "all 0.15s",
+        "&:hover": { borderColor: "text.secondary", bgcolor: "action.hover" },
+      }}
     >
       <input
         ref={fileInputRef}
         type="file"
         accept=".csv"
-        className="hidden"
+        style={{ display: "none" }}
         onChange={(e) => {
           const file = e.target.files?.[0]
           if (file) handleFile(file)
         }}
       />
-      <p className="text-sm text-gray-500">
+      <UploadFileIcon sx={{ fontSize: 32, color: "text.disabled", mb: 1 }} />
+      <Typography variant="body2" color="text.secondary">
         {fileName ? `Loaded: ${fileName}` : "Drop a CSV file here, or click to browse"}
-      </p>
-      <p className="text-xs text-gray-400 mt-1">Columns: id, amount, merchant, date</p>
-      {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
-    </div>
+      </Typography>
+      <Typography variant="caption" color="text.disabled" mt={0.5} display="block">
+        Columns: id, amount, merchant, date
+      </Typography>
+      {error && (
+        <Typography variant="caption" color="error" mt={1} display="block">
+          {error}
+        </Typography>
+      )}
+    </Box>
   )
 }

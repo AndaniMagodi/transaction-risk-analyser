@@ -1,7 +1,9 @@
 import { useState } from "react"
-import { useMutation } from "@tanstack/react-query"
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { AnimatePresence, motion } from "framer-motion"
+import { useMutation, QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import {
+  Box, Container, Typography, Paper, ToggleButtonGroup, ToggleButton,
+  TextField, Button, CircularProgress, Stack, Fade, Grid
+} from "@mui/material"
 import { analyseTransactions, type AnalysisResult, type Transaction } from "./api/analysis"
 import KpiCards from "./components/KpiCards"
 import FlaggedTable from "./components/FlaggedTable"
@@ -20,10 +22,10 @@ const SAMPLE_TRANSACTIONS: Transaction[] = [
 
 const riskColor = (level: string) => {
   switch (level) {
-    case "Critical": return "text-red-600"
-    case "High": return "text-orange-500"
-    case "Medium": return "text-yellow-500"
-    default: return "text-green-500"
+    case "Critical": return "error.main"
+    case "High": return "warning.dark"
+    case "Medium": return "warning.main"
+    default: return "success.main"
   }
 }
 
@@ -67,173 +69,155 @@ function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <header className="border-b bg-white px-6 py-4">
-        <h1 className="text-xl font-semibold">Transaction Risk Analyser</h1>
-        <p className="text-sm text-gray-500">AI-powered financial transaction risk detection</p>
-      </header>
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
+      <Box
+        sx={{
+          position: "sticky",
+          top: 0,
+          zIndex: 1100,
+          borderBottom: 1,
+          borderColor: "divider",
+          bgcolor: "background.paper",
+          px: 3,
+          py: 2,
+          textAlign: "center",
+        }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          Transaction Risk Analyser
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          AI-powered financial transaction risk detection
+        </Typography>
+      </Box>
 
-      <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
-        <KpiCards />
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Stack spacing={3}>
+          <KpiCards />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Input */}
-          <div className="space-y-4">
-            <div className="bg-white rounded-lg border p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-medium">Transaction Data</h2>
-                <div className="flex gap-1 bg-gray-100 rounded-md p-0.5">
-                  <button
-                    onClick={() => setMode("csv")}
-                    className={`text-xs px-3 py-1 rounded transition-colors ${
-                      mode === "csv" ? "bg-white shadow-sm font-medium" : "text-gray-500"
-                    }`}
-                  >
-                    CSV Upload
-                  </button>
-                  <button
-                    onClick={() => setMode("json")}
-                    className={`text-xs px-3 py-1 rounded transition-colors ${
-                      mode === "json" ? "bg-white shadow-sm font-medium" : "text-gray-500"
-                    }`}
-                  >
-                    JSON
-                  </button>
-                </div>
-              </div>
+          <Grid container spacing={3}>
+            <Grid size={{ xs: 12, lg: 6 }}>
+              <Stack spacing={3}>
+                <Paper sx={{ p: 2 }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
+                    <Typography variant="h6">Transaction Data</Typography>
+                    <ToggleButtonGroup
+                      value={mode}
+                      exclusive
+                      size="small"
+                      onChange={(_, val) => val && setMode(val)}
+                    >
+                      <ToggleButton value="csv" sx={{ textTransform: "none", px: 2 }}>CSV Upload</ToggleButton>
+                      <ToggleButton value="json" sx={{ textTransform: "none", px: 2 }}>JSON</ToggleButton>
+                    </ToggleButtonGroup>
+                  </Box>
 
-              <AnimatePresence mode="wait">
-                {mode === "csv" ? (
-                  <motion.div
-                    key="csv"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    <CsvUpload onParsed={setCsvTransactions} />
-                    {csvTransactions && (
-                      <p className="text-xs text-gray-500 mt-2">
-                        {csvTransactions.length} transactions loaded
-                      </p>
-                    )}
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="json"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    <textarea
-                      className="w-full h-64 text-xs font-mono border rounded p-3 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-gray-300 transition-shadow"
+                  {mode === "csv" ? (
+                    <Box>
+                      <CsvUpload onParsed={setCsvTransactions} />
+                      {csvTransactions && (
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+                          {csvTransactions.length} transactions loaded
+                        </Typography>
+                      )}
+                    </Box>
+                  ) : (
+                    <TextField
+                      multiline
+                      fullWidth
+                      rows={12}
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
+                      sx={{
+                        "& .MuiInputBase-root": {
+                          fontFamily: "monospace",
+                          fontSize: 12,
+                          bgcolor: "grey.50",
+                        },
+                      }}
                     />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  )}
 
-              <AnimatePresence>
-                {parseError && (
-                  <motion.p
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="text-xs text-red-500 mt-2"
+                  {parseError && (
+                    <Typography variant="caption" color="error" sx={{ mt: 1, display: "block" }}>
+                      {parseError}
+                    </Typography>
+                  )}
+
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    color="primary"
+                    onClick={handleAnalyse}
+                    disabled={isPending}
+                    sx={{ mt: 2, py: 1.2 }}
+                    startIcon={isPending ? <CircularProgress size={16} color="inherit" /> : null}
                   >
-                    {parseError}
-                  </motion.p>
-                )}
-              </AnimatePresence>
+                    {isPending ? "Analysing..." : "Analyse Transactions"}
+                  </Button>
+                </Paper>
 
-              <button
-                onClick={handleAnalyse}
-                disabled={isPending}
-                className="mt-3 w-full bg-gray-900 text-white py-2.5 rounded text-sm hover:bg-gray-700 active:scale-[0.99] transition-all disabled:opacity-50"
-              >
-                {isPending ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                    Analysing...
-                  </span>
-                ) : (
-                  "Analyse Transactions"
-                )}
-              </button>
-            </div>
+                <AnalysisHistory />
+              </Stack>
+            </Grid>
 
-            <AnalysisHistory />
-          </div>
-
-          {/* Results */}
-          <div className="space-y-4">
-            <AnimatePresence mode="wait">
+            <Grid size={{ xs: 12, lg: 6 }}>
               {!result && !isPending && (
-                <motion.div
-                  key="empty"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="bg-white rounded-lg border p-6 text-center text-sm text-gray-400"
-                >
-                  Upload or paste transaction data, then click Analyse
-                </motion.div>
+                <Paper sx={{ p: 4, textAlign: "center" }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Upload or paste transaction data, then click Analyse
+                  </Typography>
+                </Paper>
               )}
 
               {isPending && (
-                <motion.div
-                  key="loading"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="bg-white rounded-lg border p-6 text-center text-sm text-gray-400"
-                >
-                  Analysing transactions...
-                </motion.div>
+                <Paper sx={{ p: 4, textAlign: "center" }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Analysing transactions...
+                  </Typography>
+                </Paper>
               )}
 
               {result && !isPending && (
-                <motion.div
-                  key="results"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="space-y-4"
-                >
-                  <div className="bg-white rounded-lg border p-4">
-                    <h2 className="text-sm font-medium mb-3">Risk Assessment</h2>
-                    <div className="flex items-center gap-4">
-                      <div className="text-5xl font-bold">{result.risk_score}</div>
-                      <div>
-                        <div className={`text-lg font-semibold ${riskColor(result.risk_level)}`}>
-                          {result.risk_level} Risk
-                        </div>
-                        <div className="text-xs text-gray-500">out of 100</div>
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-600 mt-3">{result.summary}</p>
-                  </div>
+                <Fade in>
+                  <Stack spacing={3}>
+                    <Paper sx={{ p: 2 }}>
+                      <Typography variant="h6" sx={{ mb: 1.5 }}>Risk Assessment</Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                        <Typography variant="h2" sx={{ fontWeight: 700 }}>{result.risk_score}</Typography>
+                        <Box>
+                          <Typography variant="h6" sx={{ fontWeight: 600, color: riskColor(result.risk_level) }}>
+                            {result.risk_level} Risk
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">out of 100</Typography>
+                        </Box>
+                      </Box>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+                        {result.summary}
+                      </Typography>
+                    </Paper>
 
-                  <FlaggedTable flags={result.flags} transactions={submittedTransactions} />
+                    <FlaggedTable flags={result.flags} transactions={submittedTransactions} />
 
-                  <div className="bg-white rounded-lg border p-4">
-                    <h2 className="text-sm font-medium mb-3">Recommendations</h2>
-                    <ul className="space-y-2">
-                      {result.recommendations.map((rec, i) => (
-                        <li key={i} className="text-sm text-gray-600 flex gap-2">
-                          <span className="text-gray-400">→</span>
-                          {rec}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </motion.div>
+                    <Paper sx={{ p: 2 }}>
+                      <Typography variant="h6" sx={{ mb: 1.5 }}>Recommendations</Typography>
+                      <Stack spacing={1}>
+                        {result.recommendations.map((rec, i) => (
+                          <Box key={i} sx={{ display: "flex", gap: 1 }}>
+                            <Typography color="text.disabled">→</Typography>
+                            <Typography variant="body2" color="text.secondary">{rec}</Typography>
+                          </Box>
+                        ))}
+                      </Stack>
+                    </Paper>
+                  </Stack>
+                </Fade>
               )}
-            </AnimatePresence>
-          </div>
-        </div>
-      </main>
-    </div>
+            </Grid>
+          </Grid>
+        </Stack>
+      </Container>
+    </Box>
   )
 }
 

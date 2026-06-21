@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query"
-import { motion } from "framer-motion"
+import { Paper, Typography, Skeleton, Grid } from "@mui/material"
 import { getDashboardSummary } from "../api/analysis"
 
 const riskColor = (level: string) => {
   switch (level) {
-    case "Critical": return "text-red-600"
-    case "High": return "text-orange-500"
-    case "Medium": return "text-yellow-500"
-    default: return "text-green-500"
+    case "Critical": return "error.main"
+    case "High": return "warning.dark"
+    case "Medium": return "warning.main"
+    default: return "success.main"
   }
 }
 
@@ -20,14 +20,16 @@ export default function KpiCards() {
 
   if (isLoading || !data) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <Grid container spacing={2}>
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-white rounded-lg border p-4 animate-pulse">
-            <div className="h-3 bg-gray-200 rounded w-2/3 mb-3" />
-            <div className="h-7 bg-gray-200 rounded w-1/3" />
-          </div>
+          <Grid key={i} size={{ xs: 6, md: 3 }}>
+            <Paper sx={{ p: 2 }}>
+              <Skeleton width="60%" height={16} />
+              <Skeleton width="40%" height={32} sx={{ mt: 1 }} />
+            </Paper>
+          </Grid>
         ))}
-      </div>
+      </Grid>
     )
   }
 
@@ -39,43 +41,29 @@ export default function KpiCards() {
   ]
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="grid grid-cols-2 lg:grid-cols-4 gap-4"
-    >
-      {cards.map((card, i) => (
-        <motion.div
-          key={card.label}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: i * 0.05 }}
-          className="bg-white rounded-lg border p-4 hover:shadow-md transition-shadow"
-        >
-          <div className="text-xs text-gray-500">{card.label}</div>
-          <motion.div
-            key={card.value}
-            initial={{ scale: 1.1 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.2 }}
-            className="text-2xl font-bold mt-1"
-          >
-            {card.value}
-          </motion.div>
-        </motion.div>
+    <Grid container spacing={2}>
+      {cards.map((card) => (
+        <Grid key={card.label} size={{ xs: 6, md: 3 }}>
+          <Paper sx={{ p: 2, transition: "box-shadow 0.2s", '&:hover': { boxShadow: 2 } }}>
+            <Typography variant="caption" color="text.secondary">
+              {card.label}
+            </Typography>
+            <Typography variant="h5" fontWeight={700} mt={0.5}>
+              {card.value}
+            </Typography>
+          </Paper>
+        </Grid>
       ))}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.2 }}
-        className="bg-white rounded-lg border p-4 col-span-2 lg:col-span-4 hover:shadow-md transition-shadow"
-      >
-        <div className="text-xs text-gray-500">Current Risk Level</div>
-        <div className={`text-2xl font-bold mt-1 ${riskColor(data.risk_level)}`}>
-          {data.risk_level}
-        </div>
-      </motion.div>
-    </motion.div>
+      <Grid size={12}>
+        <Paper sx={{ p: 2, transition: "box-shadow 0.2s", '&:hover': { boxShadow: 2 } }}>
+          <Typography variant="caption" color="text.secondary">
+            Current Risk Level
+          </Typography>
+          <Typography variant="h5" fontWeight={700} mt={0.5} sx={{ color: riskColor(data.risk_level) }}>
+            {data.risk_level}
+          </Typography>
+        </Paper>
+      </Grid>
+    </Grid>
   )
 }

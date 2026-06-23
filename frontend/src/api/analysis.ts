@@ -29,6 +29,7 @@ export interface AnalysisResult {
 export interface Analysis {
   id: string
   created_at: string
+  account_name: string
   risk_score: number
   risk_level: "Low" | "Medium" | "High" | "Critical"
   summary: string
@@ -44,22 +45,30 @@ export interface DashboardSummary {
   risk_level: "Low" | "Medium" | "High" | "Critical"
 }
 
-export const analyseTransactions = async (transactions: Transaction[]): Promise<AnalysisResult> => {
-  const { data } = await api.post("/api/analyze", { transactions })
+export const analyseTransactions = async (
+  accountName: string,
+  transactions: Transaction[]
+): Promise<AnalysisResult> => {
+  const { data } = await api.post("/api/analyze", { account_name: accountName, transactions })
   return data
 }
 
-export const getTransactionHistory = async (): Promise<Transaction[]> => {
-  const { data } = await api.get("/api/transactions")
+export const getAccounts = async (): Promise<string[]> => {
+  const { data } = await api.get("/api/accounts")
   return data
 }
 
-export const getAnalyses = async (): Promise<Analysis[]> => {
-  const { data } = await api.get("/api/analyses")
+export const getTransactionHistory = async (account?: string): Promise<Transaction[]> => {
+  const { data } = await api.get("/api/transactions", { params: account ? { account } : {} })
   return data
 }
 
-export const getDashboardSummary = async (): Promise<DashboardSummary> => {
-  const { data } = await api.get("/api/dashboard")
+export const getAnalyses = async (account?: string): Promise<Analysis[]> => {
+  const { data } = await api.get("/api/analyses", { params: account ? { account } : {} })
+  return data
+}
+
+export const getDashboardSummary = async (account?: string): Promise<DashboardSummary> => {
+  const { data } = await api.get("/api/dashboard", { params: account ? { account } : {} })
   return data
 }

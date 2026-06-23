@@ -11,10 +11,14 @@ const riskColor = (level: string) => {
   }
 }
 
-export default function KpiCards() {
+interface Props {
+  account?: string
+}
+
+export default function KpiCards({ account }: Props) {
   const { data, isLoading } = useQuery({
-    queryKey: ["dashboardSummary"],
-    queryFn: getDashboardSummary,
+    queryKey: ["dashboardSummary", account],
+    queryFn: () => getDashboardSummary(account),
     refetchInterval: 5000,
   })
 
@@ -35,8 +39,8 @@ export default function KpiCards() {
 
   const cards = [
     { label: "Total Analyses", value: data.total_analyses },
-    { label: "Total Transactions", value: data.total_transactions },
-    { label: "Flagged Transactions", value: data.flagged_transactions },
+    { label: "Total Transactions Reviewed", value: data.total_transactions },
+    { label: "Total Flagged", value: data.flagged_transactions },
     { label: "Avg Risk Score", value: data.average_risk_score },
   ]
 
@@ -57,7 +61,7 @@ export default function KpiCards() {
       <Grid size={12}>
         <Paper sx={{ p: 2, transition: "box-shadow 0.2s", '&:hover': { boxShadow: 2 } }}>
           <Typography variant="caption" color="text.secondary">
-            Current Risk Level
+            Latest Risk Level
           </Typography>
           <Typography variant="h5" fontWeight={700} mt={0.5} sx={{ color: riskColor(data.risk_level) }}>
             {data.risk_level}

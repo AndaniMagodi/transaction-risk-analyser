@@ -1,10 +1,14 @@
 import { useState } from "react"
-import { useMutation, QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { useMutation, useQuery, QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import {
   Box, Container, Typography, Paper, ToggleButtonGroup, ToggleButton,
-  TextField, Button, CircularProgress, Stack, Fade, Grid
+  TextField, Button, CircularProgress, Stack, Fade, Grid,
+  Autocomplete
 } from "@mui/material"
-import { analyseTransactions, type AnalysisResult, type Transaction } from "./api/analysis"
+import {
+  analyseTransactions, getAccounts,
+  type AnalysisResult, type Transaction
+} from "./api/analysis"
 import KpiCards from "./components/KpiCards"
 import FlaggedTable from "./components/FlaggedTable"
 import AnalysisHistory from "./components/AnalysisHistory"
@@ -36,18 +40,32 @@ function Dashboard() {
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [submittedTransactions, setSubmittedTransactions] = useState<Transaction[]>([])
   const [parseError, setParseError] = useState("")
+  const [accountName, setAccountName] = useState("")
+  const [accountFilter, setAccountFilter] = useState<string | null>(null)
+
+  const { data: accounts = [] } = useQuery({
+    queryKey: ["accounts"],
+    queryFn: getAccounts,
+  })
 
   const { mutate, isPending } = useMutation({
-    mutationFn: analyseTransactions,
+    mutationFn: ({ account, transactions }: { account: string; transactions: Transaction[] }) =>
+      analyseTransactions(account, transactions),
     onSuccess: (data) => {
       setResult(data)
       queryClient.invalidateQueries({ queryKey: ["dashboardSummary"] })
       queryClient.invalidateQueries({ queryKey: ["analyses"] })
+      queryClient.invalidateQueries({ queryKey: ["accounts"] })
     },
   })
 
   const handleAnalyse = () => {
     setParseError("")
+
+    if (!accountName.trim()) {
+      setParseError("Enter an account or client name first")
+      return
+    }
 
     if (mode === "csv") {
       if (!csvTransactions || csvTransactions.length === 0) {
@@ -55,14 +73,14 @@ function Dashboard() {
         return
       }
       setSubmittedTransactions(csvTransactions)
-      mutate(csvTransactions)
+      mutate({ account: accountName.trim(), transactions: csvTransactions })
       return
     }
 
     try {
       const parsed = JSON.parse(input)
       setSubmittedTransactions(parsed)
-      mutate(parsed)
+      mutate({ account: accountName.trim(), transactions: parsed })
     } catch {
       setParseError("Invalid JSON — please check your input")
     }
@@ -93,7 +111,23 @@ function Dashboard() {
 
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={3}>
-          <KpiCards />
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <Typography variant="subtitle2" color="text.secondary">
+              Viewing stats for:
+            </Typography>
+            <Autocomplete
+              size="small"
+              options={accounts}
+              value={accountFilter}
+              onChange={(_, val) => setAccountFilter(val)}
+              sx={{ width: 260 }}
+              renderInput={(params) => (
+                <TextField {...params} placeholder="All accounts" />
+              )}
+            />
+          </Box>
+
+          <KpiCards account={accountFilter ?? undefined} />
 
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, lg: 6 }}>
@@ -111,6 +145,16 @@ function Dashboard() {
                       <ToggleButton value="json" sx={{ textTransform: "none", px: 2 }}>JSON</ToggleButton>
                     </ToggleButtonGroup>
                   </Box>
+
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Account / Client Name"
+                    placeholder="e.g. Client A, Account 12345"
+                    value={accountName}
+                    onChange={(e) => setAccountName(e.target.value)}
+                    sx={{ mb: 2 }}
+                  />
 
                   {mode === "csv" ? (
                     <Box>
@@ -157,7 +201,7 @@ function Dashboard() {
                   </Button>
                 </Paper>
 
-                <AnalysisHistory />
+                <AnalysisHistory account={accountFilter ?? undefined} />
               </Stack>
             </Grid>
 

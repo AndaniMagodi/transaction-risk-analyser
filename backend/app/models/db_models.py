@@ -8,6 +8,7 @@ class AnalysisDB(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     created_at = Column(DateTime, default=datetime.utcnow)
+    account_name = Column(String, nullable=False, default="Unnamed Account")
     transactions = Column(JSON, nullable=False)
     risk_score = Column(Integer, nullable=False)
     risk_level = Column(String, nullable=False)

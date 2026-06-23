@@ -1,15 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { Paper, Typography, Skeleton, Grid } from "@mui/material"
 import { getDashboardSummary } from "../api/analysis"
-
-const riskColor = (level: string) => {
-  switch (level) {
-    case "Critical": return "error.main"
-    case "High": return "warning.dark"
-    case "Medium": return "warning.main"
-    default: return "success.main"
-  }
-}
+import { riskColor } from "../utils/risk"
 
 interface Props {
   account?: string
@@ -52,7 +44,7 @@ export default function KpiCards({ account }: Props) {
             <Typography variant="caption" color="text.secondary">
               {card.label}
             </Typography>
-            <Typography variant="h5" fontWeight={700} mt={0.5}>
+            <Typography variant="h5" sx={{ fontWeight: 700, mt: 0.5 }}>
               {card.value}
             </Typography>
           </Paper>
@@ -63,7 +55,7 @@ export default function KpiCards({ account }: Props) {
           <Typography variant="caption" color="text.secondary">
             Latest Risk Level
           </Typography>
-          <Typography variant="h5" fontWeight={700} mt={0.5} sx={{ color: riskColor(data.risk_level) }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, mt: 0.5, color: riskColor(data.risk_level) }}>
             {data.risk_level}
           </Typography>
         </Paper>

@@ -1,51 +1,65 @@
+import uuid
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException, Depends, Query
-from pydantic import BaseModel
-from typing import Any, Optional
 from sqlalchemy.orm import Session
-from app.services.analysis_service import risk_service
+
+from app.schemas import AnalyseRequest
+from app.services.analysis_service import (
+    risk_service,
+    AnalysisServiceError,
+    MalformedResponseError,
+)
 from app.models.db_models import AnalysisDB
 from app.database import get_db
-import uuid
-from datetime import datetime
 
 router = APIRouter(prefix="/api", tags=["analysis"])
 
-class TransactionPayload(BaseModel):
-    account_name: str
-    transactions: list[dict[str, Any]]
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
 
 @router.post("/analyze")
-def analyse(payload: TransactionPayload, db: Session = Depends(get_db)):
+def analyse(payload: AnalyseRequest, db: Session = Depends(get_db)):
     try:
-        result = risk_service.analyse_transactions(payload.transactions)
+        transactions = [t.model_dump() for t in payload.transactions]
+        result = risk_service.analyse_transactions(transactions)
 
+        analysis_id = str(uuid.uuid4())
         analysis = AnalysisDB(
-            id=str(uuid.uuid4()),
-            created_at=datetime.utcnow(),
+            id=analysis_id,
+            created_at=utcnow(),
             account_name=payload.account_name,
-            transactions=payload.transactions,
+            transactions=transactions,
             risk_score=result["risk_score"],
             risk_level=result["risk_level"],
             summary=result["summary"],
             flags=result["flags"],
             recommendations=result["recommendations"],
-            total_transactions=len(payload.transactions),
-            flagged_transactions=len(result["flags"])
+            total_transactions=len(transactions),
+            flagged_transactions=len(result["flags"]),
         )
         db.add(analysis)
         db.commit()
 
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {**result, "id": analysis_id}
+    except MalformedResponseError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except AnalysisServiceError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Analysis failed")
+
 
 @router.get("/accounts")
 def get_accounts(db: Session = Depends(get_db)):
     rows = db.query(AnalysisDB.account_name).distinct().all()
     return sorted([r[0] for r in rows])
 
+
 @router.get("/dashboard")
-def get_dashboard(account: Optional[str] = Query(None), db: Session = Depends(get_db)):
+def get_dashboard(account: str | None = Query(None), db: Session = Depends(get_db)):
     query = db.query(AnalysisDB)
     if account:
         query = query.filter(AnalysisDB.account_name == account)
@@ -57,7 +71,7 @@ def get_dashboard(account: Optional[str] = Query(None), db: Session = Depends(ge
             "total_transactions": 0,
             "flagged_transactions": 0,
             "average_risk_score": 0,
-            "risk_level": "Low"
+            "risk_level": "Low",
         }
 
     latest = analyses[0]
@@ -66,21 +80,12 @@ def get_dashboard(account: Optional[str] = Query(None), db: Session = Depends(ge
         "total_transactions": sum(a.total_transactions for a in analyses),
         "flagged_transactions": sum(a.flagged_transactions for a in analyses),
         "average_risk_score": round(sum(a.risk_score for a in analyses) / len(analyses)),
-        "risk_level": latest.risk_level
+        "risk_level": latest.risk_level,
     }
 
-@router.get("/transactions")
-def get_transactions(account: Optional[str] = Query(None), db: Session = Depends(get_db)):
-    query = db.query(AnalysisDB)
-    if account:
-        query = query.filter(AnalysisDB.account_name == account)
-    latest = query.order_by(AnalysisDB.created_at.desc()).first()
-    if not latest:
-        return []
-    return latest.transactions
 
 @router.get("/analyses")
-def get_analyses(account: Optional[str] = Query(None), db: Session = Depends(get_db)):
+def get_analyses(account: str | None = Query(None), db: Session = Depends(get_db)):
     query = db.query(AnalysisDB)
     if account:
         query = query.filter(AnalysisDB.account_name == account)
@@ -94,10 +99,11 @@ def get_analyses(account: Optional[str] = Query(None), db: Session = Depends(get
             "risk_level": a.risk_level,
             "total_transactions": a.total_transactions,
             "flagged_transactions": a.flagged_transactions,
-            "summary": a.summary
+            "summary": a.summary,
         }
         for a in analyses
     ]
+
 
 @router.get("/analyses/{analysis_id}")
 def get_analysis_detail(analysis_id: str, db: Session = Depends(get_db)):
@@ -115,8 +121,9 @@ def get_analysis_detail(analysis_id: str, db: Session = Depends(get_db)):
         "recommendations": analysis.recommendations,
         "transactions": analysis.transactions,
         "total_transactions": analysis.total_transactions,
-        "flagged_transactions": analysis.flagged_transactions
+        "flagged_transactions": analysis.flagged_transactions,
     }
+
 
 @router.get("/health")
 def health():

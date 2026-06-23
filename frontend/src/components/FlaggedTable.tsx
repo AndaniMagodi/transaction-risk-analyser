@@ -24,7 +24,7 @@ export default function FlaggedTable({ flags, transactions }: Props) {
 
   return (
     <Paper sx={{ p: 2 }}>
-      <Typography variant="h6" mb={1.5}>
+      <Typography variant="h6" sx={{ mb: 1.5 }}>
         Flagged Transactions ({flags.length})
       </Typography>
       <TableContainer>
@@ -62,7 +62,7 @@ export default function FlaggedTable({ flags, transactions }: Props) {
         </Table>
       </TableContainer>
       {flags.length === 0 && (
-        <Box py={3} textAlign="center">
+        <Box sx={{ py: 3, textAlign: "center" }}>
           <Typography variant="body2" color="text.secondary">
             No flagged transactions
           </Typography>

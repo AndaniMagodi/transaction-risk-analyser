@@ -1,32 +1,20 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
   Paper, Typography, Box, Chip, Stack, Divider, Collapse, CircularProgress
 } from "@mui/material"
-import axios from "axios"
-import { getAnalyses } from "../api/analysis"
+import { getAnalyses, getAnalysisDetail, type AnalysisDetail } from "../api/analysis"
+import { riskChipColor } from "../utils/risk"
 import FlaggedTable from "./FlaggedTable"
-
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000",
-})
-
-const riskChipColor = (level: string): "error" | "warning" | "info" | "success" => {
-  switch (level) {
-    case "Critical": return "error"
-    case "High": return "warning"
-    case "Medium": return "info"
-    default: return "success"
-  }
-}
 
 interface Props {
   account?: string
+  expandAnalysisId?: string | null
 }
 
-export default function AnalysisHistory({ account }: Props) {
+export default function AnalysisHistory({ account, expandAnalysisId }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [detailCache, setDetailCache] = useState<Record<string, any>>({})
+  const [detailCache, setDetailCache] = useState<Record<string, AnalysisDetail>>({})
   const [loadingId, setLoadingId] = useState<string | null>(null)
 
   const { data: analyses = [] } = useQuery({
@@ -35,26 +23,35 @@ export default function AnalysisHistory({ account }: Props) {
     refetchInterval: 5000,
   })
 
+  const loadDetail = async (id: string) => {
+    if (detailCache[id]) return
+    setLoadingId(id)
+    try {
+      const detail = await getAnalysisDetail(id)
+      setDetailCache((prev) => ({ ...prev, [id]: detail }))
+    } finally {
+      setLoadingId(null)
+    }
+  }
+
+  useEffect(() => {
+    if (!expandAnalysisId) return
+    setExpandedId(expandAnalysisId)
+    loadDetail(expandAnalysisId)
+  }, [expandAnalysisId])
+
   const handleToggle = async (id: string) => {
     if (expandedId === id) {
       setExpandedId(null)
       return
     }
     setExpandedId(id)
-    if (!detailCache[id]) {
-      setLoadingId(id)
-      try {
-        const { data } = await api.get(`/api/analyses/${id}`)
-        setDetailCache((prev) => ({ ...prev, [id]: data }))
-      } finally {
-        setLoadingId(null)
-      }
-    }
+    await loadDetail(id)
   }
 
   return (
     <Paper sx={{ p: 2 }}>
-      <Typography variant="h6" mb={1.5}>
+      <Typography variant="h6" sx={{ mb: 1.5 }}>
         Analysis History
       </Typography>
 
@@ -68,20 +65,30 @@ export default function AnalysisHistory({ account }: Props) {
             <Box key={a.id}>
               <Box
                 onClick={() => handleToggle(a.id)}
-                sx={{ cursor: "pointer", "&:hover": { opacity: 0.8 } }}
-                display="flex"
-                justifyContent="space-between"
-                alignItems="flex-start"
-                gap={1}
+                sx={{
+                  cursor: "pointer",
+                  "&:hover": { opacity: 0.8 },
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: 1,
+                  bgcolor: expandedId === a.id ? "action.hover" : "transparent",
+                  borderRadius: 1,
+                  p: expandedId === a.id ? 1 : 0,
+                  mx: expandedId === a.id ? -1 : 0,
+                }}
               >
-                <Box flex={1} minWidth={0}>
-                  <Typography variant="body2" fontWeight={600}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
                     {new Date(a.created_at).toLocaleString()}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" mt={0.5}>
+                  <Typography variant="caption" color="primary" sx={{ display: "block" }}>
+                    {a.account_name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                     {a.summary}
                   </Typography>
-                  <Typography variant="caption" color="text.disabled" mt={0.5} display="block">
+                  <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: "block" }}>
                     {a.total_transactions} transactions · {a.flagged_transactions} flagged
                   </Typography>
                 </Box>
@@ -94,9 +101,9 @@ export default function AnalysisHistory({ account }: Props) {
               </Box>
 
               <Collapse in={expandedId === a.id}>
-                <Box mt={1.5}>
+                <Box sx={{ mt: 1.5 }}>
                   {loadingId === a.id ? (
-                    <Box display="flex" justifyContent="center" py={2}>
+                    <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
                       <CircularProgress size={20} />
                     </Box>
                   ) : detailCache[a.id] ? (
@@ -105,13 +112,13 @@ export default function AnalysisHistory({ account }: Props) {
                         flags={detailCache[a.id].flags}
                         transactions={detailCache[a.id].transactions}
                       />
-                      {detailCache[a.id].recommendations?.length > 0 && (
+                      {detailCache[a.id].recommendations.length > 0 && (
                         <Box>
-                          <Typography variant="caption" fontWeight={600} display="block" mb={0.5}>
+                          <Typography variant="caption" sx={{ fontWeight: 600, display: "block", mb: 0.5 }}>
                             Recommendations
                           </Typography>
                           <Stack spacing={0.5}>
-                            {detailCache[a.id].recommendations.map((rec: string, idx: number) => (
+                            {detailCache[a.id].recommendations.map((rec, idx) => (
                               <Typography key={idx} variant="caption" color="text.secondary">
                                 → {rec}
                               </Typography>

@@ -1,15 +1,14 @@
 import axios from "axios"
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000",
+  baseURL: import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? "" : "http://localhost:8000"),
 })
 
 export interface Transaction {
-  id: number
+  id: number | string
   amount: number
   merchant: string
   date: string
-  [key: string]: any
 }
 
 export interface Flag {
@@ -19,6 +18,7 @@ export interface Flag {
 }
 
 export interface AnalysisResult {
+  id: string
   risk_score: number
   risk_level: "Low" | "Medium" | "High" | "Critical"
   summary: string
@@ -35,6 +35,12 @@ export interface Analysis {
   summary: string
   total_transactions: number
   flagged_transactions: number
+}
+
+export interface AnalysisDetail extends Analysis {
+  flags: Flag[]
+  recommendations: string[]
+  transactions: Transaction[]
 }
 
 export interface DashboardSummary {
@@ -58,13 +64,13 @@ export const getAccounts = async (): Promise<string[]> => {
   return data
 }
 
-export const getTransactionHistory = async (account?: string): Promise<Transaction[]> => {
-  const { data } = await api.get("/api/transactions", { params: account ? { account } : {} })
+export const getAnalyses = async (account?: string): Promise<Analysis[]> => {
+  const { data } = await api.get("/api/analyses", { params: account ? { account } : {} })
   return data
 }
 
-export const getAnalyses = async (account?: string): Promise<Analysis[]> => {
-  const { data } = await api.get("/api/analyses", { params: account ? { account } : {} })
+export const getAnalysisDetail = async (id: string): Promise<AnalysisDetail> => {
+  const { data } = await api.get(`/api/analyses/${id}`)
   return data
 }
 

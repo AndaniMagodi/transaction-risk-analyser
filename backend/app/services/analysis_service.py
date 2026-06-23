@@ -1,9 +1,22 @@
-import os
 import json
+import os
+
 from groq import Groq
 from dotenv import load_dotenv
+from pydantic import ValidationError
+
+from app.schemas import AnalysisResult
 
 load_dotenv()
+
+
+class AnalysisServiceError(Exception):
+    pass
+
+
+class MalformedResponseError(AnalysisServiceError):
+    pass
+
 
 class RiskAnalysisService:
     def __init__(self):
@@ -33,12 +46,15 @@ Return this exact JSON structure:
 
 Flag transactions that show: unusually large amounts, duplicate entries, round number patterns, rapid succession transactions, unusual merchants, or amounts that deviate significantly from the norm."""
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-            max_tokens=1024,
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=1024,
+            )
+        except Exception as e:
+            raise AnalysisServiceError("LLM request failed") from e
 
         response_text = response.choices[0].message.content.strip()
 
@@ -47,7 +63,15 @@ Flag transactions that show: unusually large amounts, duplicate entries, round n
             if response_text.startswith("json"):
                 response_text = response_text[4:]
 
-        return json.loads(response_text.strip())
+        try:
+            parsed = json.loads(response_text.strip())
+        except json.JSONDecodeError as e:
+            raise MalformedResponseError("LLM returned invalid JSON") from e
 
-# Singleton
+        try:
+            return AnalysisResult.model_validate(parsed).model_dump()
+        except ValidationError as e:
+            raise MalformedResponseError("LLM response did not match expected schema") from e
+
+
 risk_service = RiskAnalysisService()

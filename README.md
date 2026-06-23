@@ -10,8 +10,9 @@ Built to demonstrate practical use of AI APIs in a real, working application —
 
 - Upload a CSV of transactions (or paste raw JSON)
 - An LLM analyses the batch and returns a structured risk assessment
-- Every analysis is persisted to PostgreSQL
+- Every analysis is persisted to PostgreSQL with a stable ID
 - A live dashboard tracks running stats across all analyses — total transactions processed, flagged counts, average risk score
+- Analyses can be scoped by account/client name
 - Flagged transactions are cross-referenced back to the original data and shown in a sortable table with merchant, amount, reason, and severity
 
 ---
@@ -19,7 +20,8 @@ Built to demonstrate practical use of AI APIs in a real, working application —
 ## Architecture
 
 **Single FastAPI service** serves both the API and the built React frontend (via `StaticFiles` + a catch-all route for client-side routing). One process, one deployment, one URL.
-**Why a single AI integration point:** the value here isn't the number of API calls, it's the design around the call — structured prompting for reliable JSON output, persistence of every result, and a dashboard that aggregates history meaningfully.
+
+**Why a single AI integration point:** the value here isn't the number of API calls, it's the design around the call — structured prompting for reliable JSON output, schema validation of LLM responses, persistence of every result, and a dashboard that aggregates history meaningfully.
 
 ---
 
@@ -33,9 +35,9 @@ Built to demonstrate practical use of AI APIs in a real, working application —
 
 | Layer | Technology |
 |---|---|
-| Backend | Python, FastAPI, SQLAlchemy, PostgreSQL |
+| Backend | Python, FastAPI, SQLAlchemy, PostgreSQL, Pydantic |
 | AI | Groq API (Llama 3.1 8B Instant) |
-| Frontend | React, TypeScript, TanStack Query, Tailwind CSS, Framer Motion |
+| Frontend | React, TypeScript, MUI, TanStack Query |
 | CSV Parsing | PapaParse |
 
 ---
@@ -44,10 +46,11 @@ Built to demonstrate practical use of AI APIs in a real, working application —
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/analyze` | Analyse a batch of transactions, persist the result |
-| GET | `/api/dashboard` | Aggregate stats across all analyses |
-| GET | `/api/transactions` | Transactions from the most recent analysis |
-| GET | `/api/analyses` | Full history of past analyses |
+| POST | `/api/analyze` | Analyse a batch of transactions, persist the result, return result with `id` |
+| GET | `/api/accounts` | Distinct account/client names |
+| GET | `/api/dashboard` | Aggregate stats (optional `?account=` filter) |
+| GET | `/api/analyses` | Analysis history (optional `?account=` filter) |
+| GET | `/api/analyses/{id}` | Full analysis detail including flags and transactions |
 | GET | `/api/health` | Health check |
 
 ---
@@ -67,6 +70,7 @@ Built to demonstrate practical use of AI APIs in a real, working application —
 cd frontend
 npm install
 npm run build
+mkdir -p ../backend/static
 cp -r dist/* ../backend/static/
 
 # 2. Set up the backend
@@ -94,8 +98,11 @@ Visit `http://localhost:8000` — the dashboard and API are served from the same
 
 ```bash
 cd frontend
+npm install
 npm run dev
 ```
+
+In another terminal, run the backend on port 8000. The Vite dev server proxies API calls to `http://localhost:8000` automatically in development.
 
 ---
 
@@ -107,11 +114,14 @@ id,amount,merchant,date
 2,50000,Unknown,2026-06-15
 ```
 
+Each row must include `id`, `amount`, `merchant`, and `date`.
+
 ---
 
 ## Design Decisions
 
-- **Single AI integration, designed properly** — rather than bolting on multiple shallow AI calls, the focus was on getting one integration right: structured output, error handling for malformed JSON, and persistence.
+- **Single AI integration, designed properly** — structured output, Pydantic validation of LLM JSON, and persistence of every run.
 - **Native ZAR amounts** — no currency conversion; this targets the South African market directly.
 - **Groq over OpenAI/Anthropic** — chosen for free-tier accessibility while building; the `RiskAnalysisService` abstraction means switching providers is a single-file change.
 - **Unified deployment** — FastAPI serves the built frontend directly, avoiding the complexity of two separate deployed services for what is fundamentally one small application.
+- **Account scoping** — each analysis is tagged with an account/client name so dashboard stats and history can be filtered per client.

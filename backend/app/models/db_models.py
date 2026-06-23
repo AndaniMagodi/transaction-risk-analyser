@@ -1,13 +1,20 @@
-from sqlalchemy import Column, Integer, Float, String, DateTime, JSON
-from app.database import Base
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
+
+from sqlalchemy import Column, Integer, String, DateTime, JSON
+
+from app.database import Base
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
 
 class AnalysisDB(Base):
     __tablename__ = "analyses"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
     account_name = Column(String, nullable=False, default="Unnamed Account")
     transactions = Column(JSON, nullable=False)
     risk_score = Column(Integer, nullable=False)

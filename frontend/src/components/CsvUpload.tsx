@@ -79,11 +79,11 @@ export default function CsvUpload({ onParsed }: Props) {
       <Typography variant="body2" color="text.secondary">
         {fileName ? `Loaded: ${fileName}` : "Drop a CSV file here, or click to browse"}
       </Typography>
-      <Typography variant="caption" color="text.disabled" mt={0.5} display="block">
+      <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: "block" }}>
         Columns: id, amount, merchant, date
       </Typography>
       {error && (
-        <Typography variant="caption" color="error" mt={1} display="block">
+        <Typography variant="caption" color="error" sx={{ mt: 1, display: "block" }}>
           {error}
         </Typography>
       )}

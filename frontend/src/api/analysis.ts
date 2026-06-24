@@ -78,3 +78,8 @@ export const getDashboardSummary = async (account?: string): Promise<DashboardSu
   const { data } = await api.get("/api/dashboard", { params: account ? { account } : {} })
   return data
 }
+
+export const askAboutAnalysis = async (analysisId: string, question: string): Promise<string> => {
+  const { data } = await api.post(`/api/analyses/${analysisId}/ask`, { text: question })
+  return data.answer
+}

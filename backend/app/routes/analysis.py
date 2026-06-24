@@ -1,10 +1,12 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends, Query
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.schemas import AnalyseRequest
+from app.schemas import AnalyseRequest, AskRequest
 from app.services.analysis_service import (
     risk_service,
     AnalysisServiceError,
@@ -12,6 +14,8 @@ from app.services.analysis_service import (
 )
 from app.models.db_models import AnalysisDB
 from app.database import get_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["analysis"])
 
@@ -22,34 +26,70 @@ def utcnow() -> datetime:
 
 @router.post("/analyze")
 def analyse(payload: AnalyseRequest, db: Session = Depends(get_db)):
+    transactions = [t.model_dump() for t in payload.transactions]
+
     try:
-        transactions = [t.model_dump() for t in payload.transactions]
-        result = risk_service.analyse_transactions(transactions)
-
-        analysis_id = str(uuid.uuid4())
-        analysis = AnalysisDB(
-            id=analysis_id,
-            created_at=utcnow(),
-            account_name=payload.account_name,
-            transactions=transactions,
-            risk_score=result["risk_score"],
-            risk_level=result["risk_level"],
-            summary=result["summary"],
-            flags=result["flags"],
-            recommendations=result["recommendations"],
-            total_transactions=len(transactions),
-            flagged_transactions=len(result["flags"]),
-        )
-        db.add(analysis)
-        db.commit()
-
-        return {**result, "id": analysis_id}
+        result = risk_service.analyse_transactions_batched(transactions)
     except MalformedResponseError as e:
+        logger.warning("LLM returned malformed response: %s", e)
         raise HTTPException(status_code=502, detail=str(e))
     except AnalysisServiceError as e:
+        logger.error("LLM request failed: %s", e)
         raise HTTPException(status_code=502, detail=str(e))
-    except Exception:
-        raise HTTPException(status_code=500, detail="Analysis failed")
+
+    analysis_id = str(uuid.uuid4())
+    analysis = AnalysisDB(
+        id=analysis_id,
+        created_at=utcnow(),
+        account_name=payload.account_name,
+        transactions=transactions,
+        risk_score=result["risk_score"],
+        risk_level=result["risk_level"],
+        summary=result["summary"],
+        flags=result["flags"],
+        recommendations=result["recommendations"],
+        total_transactions=len(transactions),
+        flagged_transactions=len(result["flags"]),
+    )
+
+    try:
+        db.add(analysis)
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error("Failed to persist analysis %s: %s", analysis_id, e)
+        raise HTTPException(
+            status_code=500,
+            detail="Analysis completed but could not be saved",
+        )
+
+    return {**result, "id": analysis_id}
+
+
+@router.post("/analyses/{analysis_id}/ask")
+def ask_about_analysis(
+    analysis_id: str, payload: AskRequest, db: Session = Depends(get_db)
+):
+    analysis = db.query(AnalysisDB).filter(AnalysisDB.id == analysis_id).first()
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    try:
+        answer = risk_service.answer_followup(
+            transactions=analysis.transactions,
+            prior_result={
+                "risk_score": analysis.risk_score,
+                "risk_level": analysis.risk_level,
+                "summary": analysis.summary,
+                "flags": analysis.flags,
+            },
+            question=payload.text,
+        )
+    except AnalysisServiceError as e:
+        logger.error("Follow-up question failed for %s: %s", analysis_id, e)
+        raise HTTPException(status_code=502, detail=str(e))
+
+    return {"answer": answer}
 
 
 @router.get("/accounts")

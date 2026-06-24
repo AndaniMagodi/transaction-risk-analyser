@@ -14,6 +14,7 @@ import KpiCards from "./components/KpiCards"
 import FlaggedTable from "./components/FlaggedTable"
 import AnalysisHistory from "./components/AnalysisHistory"
 import CsvUpload from "./components/CsvUpload"
+import AskAnalysis from "./components/AskAnalysis"
 
 const queryClient = new QueryClient()
 
@@ -289,6 +290,8 @@ function Dashboard() {
                         ))}
                       </Stack>
                     </Paper>
+                    {displayResult.id && <AskAnalysis analysisId={displayResult.id} />}
+
                   </Stack>
                 </Fade>
               )}
